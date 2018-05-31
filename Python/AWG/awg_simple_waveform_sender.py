@@ -23,30 +23,25 @@ def search_connect(ipAddress):
     return inst
 
 
-def create_wfm(fs, cf, rl, res='WPR'):
-    """Creates and returns a waveform with the appropriate binary formatting
-    based on the chosen DAC resolution and checks for minimum size and wfm
-    granularity."""
+def check_wfm(wfm, res='WPR'):
+    """Checks minimum size and granularity and returns waveform with
+    appropriate binary formatting based on the chosen DAC resolution."""
+
+    rl = len(wfm)
     if res.lower() == 'wpr':
         if rl < 240:
             raise ValueError('Waveform must be at least 240 samples.')
         if rl % 48 != 0:
             raise ValueError('Waveform must have a granularity of 48.')
+        return np.array(8191 * wfm, dtype=np.int16) << 2
     elif res.lower() == 'wsp':
         if rl < 320:
             raise ValueError('Waveform must be at least 320 samples.')
         if rl % 64 != 0:
             raise ValueError('Waveform must have a granularity of 64.')
+        return np.array(2047 * wfm, dtype=np.int16) << 4
     else:
         raise ValueError('Invalid output resolution selected. Choose \'wpr\' for 14 bits or \'wsp\' or 12 bits.')
-
-    t = np.linspace(0, rl / fs, rl)
-    wfm = np.sin(2 * np.pi * cf * t)
-    if res.lower() == 'wpr':
-        wfm = np.array(8191 * wfm, dtype=np.int16) << 2
-    elif res.lower() == 'wsp':
-        wfm = np.array(2047 * wfm, dtype=np.int16) << 4
-    return wfm
 
 
 def err_check(inst):
@@ -57,7 +52,8 @@ def err_check(inst):
 
 
 def main():
-    awg = search_connect('141.121.210.216')
+    # Use hostname or IP address of instrument
+    awg = search_connect('TW56330490.cla.is.keysight.com')
     awg.write('*rst')
     awg.query('*opc?')
     awg.write('abort')
@@ -76,15 +72,16 @@ def main():
 
     # Define a waveform.
     res = 'wsp'     # use 'wsp' for 12-bit and 'wpr' for 14-bit
-    fs = 8e9
-    f = 100e6
-    rl = fs / f * 64
 
     awg.write('trace:dwidth {}'.format(res))
     res = awg.query('trace:dwidth?').strip()
     print('Output res/mode: {}'.format(res))
 
-    wfm = create_wfm(fs, f, rl, res=res)
+    fs = 8e9
+    f = 100e6
+    rl = fs / f * 64
+    t = np.linspace(0, rl / fs, rl)
+    wfm = check_wfm(np.sin(2 * np.pi * f * t), res)
 
     # Define segment 1 and populate it with waveform data.
     awg.write('trace:def 1, {}'.format(rl))
@@ -102,6 +99,7 @@ def main():
     awg.query('*opc?')
 
     err_check(awg)
+    awg.close()
 
 
 if __name__ == '__main__':
