@@ -1,7 +1,7 @@
 """
-Simple Pulse Sequence Builder for Keysight AWGs
+Simple Pulse Sequence Builder
 Author: Morgan Allison
-Updated: 05/18
+Updated: 06/18
 Creates a single simple rectanglar RF pulse using data and idle segments in the sequencer.
 Python 3.6.4
 PyVISA 1.9.0
@@ -13,13 +13,18 @@ import visa
 import numpy as np
 
 
+class awgError(Exception):
+    """Generic class for AWG related errors"""
+    pass
+
+
 def search_connect(ipAddress):
     """Configures and returns instrument VISA object using its IP address."""
     rm = visa.ResourceManager()
-    inst = rm.open_resource('TCPIP0::{}::inst0:INST'.format(ipAddress))
+    inst = rm.open_resource(f'TCPIP0::{ipAddress}::inst0:INST')
     inst.timeout = 10000
     inst.write('*cls')
-    print('Connected to {}'.format(inst.query('*idn?')))
+    print('Connected to', inst.query('*idn?'))
     return inst
 
 
@@ -30,7 +35,7 @@ def err_check(inst):
     print(inst.query('syst:err?'))
 
 
-def check_wfm(wfm, res='WPR'):
+def check_wfm(wfm, res='wsp'):
     """Checks minimum size and granularity and returns waveform with
     appropriate binary formatting based on the chosen DAC resolution."""
     if res.lower() == 'wpr':
@@ -44,13 +49,13 @@ def check_wfm(wfm, res='WPR'):
         binMult = 2047
         binShift = 4
     else:
-        raise ValueError('Invalid output resolution selected. Choose \'wpr\' for 14 bits or \'wsp\' or 12 bits.')
+        raise awgError('Invalid output resolution selected. Choose \'wpr\' for 14 bits or \'wsp\' or 12 bits.')
 
     rl = len(wfm)
     if rl < minLen:
-        raise ValueError('Waveform must be at least 240 samples.')
+        raise awgError(f'Waveform must be at least {minLen} samples.')
     if rl % gran != 0:
-        raise ValueError('Waveform must have a granularity of 48.')
+        raise awgError(f'Waveform must have a granularity of {gran}.')
 
     return np.array(binMult * wfm, dtype=np.int16) << binShift
 
@@ -98,40 +103,47 @@ def cw_pulse_sequence(fs, cf, pwTime, pri, res='wpr'):
     if idleSamples < 3 * gran / fs:
         print('Minimum idle time not satisfied. Unexpected trig-to-output behavior likely.')
 
-    # print('Extra length: {} samples, {} seconds.'.format(extra, extra / fs))
-    # print('Total length of pulse on: {} samples, {} seconds.'.format(len(pulseOn), len(pulseOn) / fs))
-    # print('Effective off time: ', (idleSamples + len(endWfm) + extra) / fs)
-
     return pulseOn, endWfm, idleSamples
 
 
 def main():
-    awg = search_connect('TW56330490.cla.is.keysight.com')
+    """CW pulse sequence creation example."""
+    # Substitute your instrument's IP address here.
+    awg = search_connect('TW56330445.cla.is.keysight.com')
     awg.write('*rst')
     awg.query('*opc?')
     awg.write('abort')
 
-    # Define a waveform.
-    res = 'wsp'     # use 'wsp' for 12-bit and 'wpr' for 14-bit
-
-    awg.write('trace:dwidth {}'.format(res))
-    res = awg.query('trace:dwidth?').strip()
-    print('Output res/mode: {}'.format(res))
-
-    fs = 7.2e9
+    # User-defined sample rate, carrier freq, pulse width, and pri
+    ############################################################################
+    fs = 10e9
     cf = 100e6
-    width = 1e-6
-    pri = 10.153e-6
+    width = 10e-6
+    pri = 20e-6
+    ############################################################################
 
+    # Define resolution
+    # use 'wsp' for 12-bit and 'wpr' for 14-bit
+    res = 'wsp'
+    awg.write(f'trace1:dwidth {res}')
+    print(f'Output res/mode: ', awg.query('trace1:dwidth?').strip())
+
+    # Set sample rate
+    awg.write(f'frequency:raster {fs}')
+    print('Sample rate: ', awg.query('frequency:raster?').strip())
+
+    # Configure and enable output path.
+    awg.write('output1:route dac')
+    awg.write('output1:norm on')
+
+    # Create building blocks for cw pulse sequence
     pulseOn, endWfm, idleSamples = cw_pulse_sequence(fs, cf, width, pri, res)
 
-    awg.write('trace:def 1, {}'.format(len(pulseOn)))
+    # Define required waveforms and send data to AWG
+    awg.write(f'trace:def 1, {len(pulseOn)}')
     awg.write_binary_values('trace:data 1, 0, ', pulseOn, datatype='h')
-    awg.write('trace:def 2, {}'.format(len(endWfm)))
+    awg.write(f'trace:def 2, {len(endWfm)}')
     awg.write_binary_values('trace:data 2, 0, ', endWfm, datatype='h')
-
-    awg.write('seq:delete:all')
-    awg.query('seq:def:new? 3')
 
     """
     Command Documentation
@@ -141,25 +153,24 @@ def main():
     stable:data <seq_table_index>, <control_entry>, <seq_loop_cnt>, <command_code>, <idle_sample>, <idle_delay>, 0
     Descriptions of the command arguments (<control_entry>, <seq_loop_cnt>, etc.) can be found
     on pages 262-265 in Keysight M8190A User's Guide (Edition 13.0, October 2017).
+
     """
-    awg.write('stable:data 0, {}, 1, 1, 1, 0, #hffffffff'.format(1 << 28))
-    awg.write('stable:data 1, {}, 0, 0, 0, {}, 0'.format(1 << 31, idleSamples))
-    awg.write('stable:data 2, {}, 0, 1, 2, 0, #hffffffff'.format(1 << 30))
+    # Build sequence
+    awg.write('seq:delete:all')
+    awg.query('seq:def:new? 3')
+    awg.write(f'stable1:data 0, {1 << 28}, 1, 1, 1, 0, #hffffffff')
+    awg.write(f'stable1:data 1, {1 << 31}, 0, 0, 0, {idleSamples}, 0')
+    awg.write(f'stable1:data 2, {1 << 30}, 0, 1, 2, 0, #hffffffff')
 
-    awg.write('source:func:mode stsequence')
-
-    # Configure and enable on output path.
-    awg.write('output1:route dac')
-    awg.write('output:norm on')
-    # print('Output path: {}'.format(awg.query('output1:route?')))
-
-    # Assign sequence 0 to channel 1 and start continuous playback.
+    # Configure AWG to output a sequence and begin playback.
+    awg.write('source:func1:mode stsequence')
     awg.write('stable:seq:sel 0')
     awg.write('init:cont on')
     awg.write('init:imm')
     awg.query('*opc?')
 
     err_check(awg)
+    awg.close()
 
 
 if __name__ == '__main__':
