@@ -14,7 +14,7 @@ import numpy as np
 
 
 class awgError(Exception):
-    """Generic class for AWG related errors"""
+    """Generic class for AWG related errors."""
     pass
 
 
@@ -77,7 +77,7 @@ def cw_pulse_sequence(fs, cf, pwTime, pri, res='wpr'):
     tOn = np.linspace(0, pwTime, pwSamples)
     pulseOn = np.sin(2 * np.pi * cf * tOn)
 
-    # Check length and granularity requirements and calc extra samples needed
+    # Check length and granularity requirements and calc extra samples needed.
     # Minimum length
     if pwSamples < minLen:
         extra = minLen - pwSamples
@@ -85,7 +85,7 @@ def cw_pulse_sequence(fs, cf, pwTime, pri, res='wpr'):
     else:
         extra = gran - (pwSamples % gran)
 
-    # Apply len/gran corrections
+    # Apply length and granularity corrections.
     pulseOn = np.append(pulseOn, np.zeros(extra))
     pulseOn = check_wfm(pulseOn, res)
 
@@ -114,7 +114,7 @@ def main():
     awg.query('*opc?')
     awg.write('abort')
 
-    # User-defined sample rate, carrier freq, pulse width, and pri
+    # User-defined sample rate, carrier freq, pulse width, and pri.
     ############################################################################
     fs = 10e9
     cf = 100e6
@@ -122,13 +122,12 @@ def main():
     pri = 20e-6
     ############################################################################
 
-    # Define resolution
-    # use 'wsp' for 12-bit and 'wpr' for 14-bit
+    # Define DAC resolution. Use 'wsp' for 12-bit and 'wpr' for 14-bit.
     res = 'wsp'
     awg.write(f'trace1:dwidth {res}')
     print(f'Output res/mode: ', awg.query('trace1:dwidth?').strip())
 
-    # Set sample rate
+    # Set sample rate.
     awg.write(f'frequency:raster {fs}')
     print('Sample rate: ', awg.query('frequency:raster?').strip())
 
@@ -136,10 +135,10 @@ def main():
     awg.write('output1:route dac')
     awg.write('output1:norm on')
 
-    # Create building blocks for cw pulse sequence
+    # Create building blocks for cw pulse sequence.
     pulseOn, endWfm, idleSamples = cw_pulse_sequence(fs, cf, width, pri, res)
 
-    # Define required waveforms and send data to AWG
+    # Define required waveforms and send data to AWG.
     awg.write(f'trace:def 1, {len(pulseOn)}')
     awg.write_binary_values('trace:data 1, 0, ', pulseOn, datatype='h')
     awg.write(f'trace:def 2, {len(endWfm)}')
@@ -155,7 +154,7 @@ def main():
     on pages 262-265 in Keysight M8190A User's Guide (Edition 13.0, October 2017).
 
     """
-    # Build sequence
+    # Build sequence.
     awg.write('seq:delete:all')
     awg.query('seq:def:new? 3')
     awg.write(f'stable1:data 0, {1 << 28}, 1, 1, 1, 0, #hffffffff')
@@ -169,6 +168,7 @@ def main():
     awg.write('init:imm')
     awg.query('*opc?')
 
+    # Check for errors and gracefully disconnect.
     err_check(awg)
     awg.close()
 

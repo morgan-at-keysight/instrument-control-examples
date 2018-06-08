@@ -16,12 +16,12 @@ import numpy as np
 
 
 class awgError(Exception):
-    """Generic class for AWG related errors"""
+    """Generic class for AWG related errors."""
     pass
 
 
 class phaseCoherentError(Exception):
-    """Generic class for phase calculation related errors"""
+    """Generic class for phase calculation related errors."""
     pass
 
 
@@ -96,7 +96,7 @@ def cw_pulse_sequence_coherent(fs, cf, pwTime, pri, res='wsp'):
     else:
         raise awgError('Invalid output resolution selected. Choose \'wpr\' for 14 bits or \'wsp\' or 12 bits.')
 
-    # Check length and granularity requirements and calc extra samples needed
+    # Check length and granularity requirements and calc extra samples needed.
     pwSamples = int(fs * pwTime)
     tOn = np.linspace(0, pwTime, pwSamples, endpoint=False)
 
@@ -107,7 +107,7 @@ def cw_pulse_sequence_coherent(fs, cf, pwTime, pri, res='wsp'):
     else:
         extra = gran - (pwSamples % gran)
 
-    # Calculate pulse-pulse phase shift and number of pulses required for full wraparound
+    # Calculate pulse-pulse phase shift and number of pulses required for full wraparound.
     deltaPhi, numPulses = phase_shift_calculator(cf, pri, fs)
     print(f'deltaPhi per PRI: {deltaPhi}\nPulses needed for wraparound: {numPulses}')
 
@@ -116,12 +116,12 @@ def cw_pulse_sequence_coherent(fs, cf, pwTime, pri, res='wsp'):
     for p in range(numPulses):
         temp = np.append(np.sin(2 * np.pi * cf * tOn + (p * deltaPhi * 2 * np.pi / 360)), np.zeros(extra))
         pulses[p] = check_wfm(temp, res)
-        # Create marker signal for first pulse
+        # Create marker signal for first pulse.
         if p == 0:
             marker = np.append(1 * np.ones(int(len(temp) / 2)), np.zeros(int(len(temp) / 2)))
             pulses[p] = pulses[p] + marker
 
-    # Build pulse off time waveform/idle segments
+    # Build pulse off time waveform and idle segments.
     # endWfm exists because an idle segment cannot be the first or last segment in a sequence.
     endWfm = check_wfm(np.zeros(minLen), res)
     idleSamples = round((fs * pri) - pulses.shape[1])
@@ -140,7 +140,7 @@ def main():
     awg.query('*opc?')
     awg.write('abort')
 
-    # User-defined sample rate, carrier freq, pulse width, and pri
+    # User-defined sample rate, carrier freq, pulse width, and pri.
     ############################################################################
     fs = 10e9
     cf = 100e6
@@ -148,13 +148,12 @@ def main():
     pri = 20.0025e-6
     ############################################################################
 
-    # Define resolution
-    # use 'wsp' for 12-bit and 'wpr' for 14-bit
+    # Define DAC resolution. Use 'wsp' for 12-bit and 'wpr' for 14-bit.
     res = 'wsp'
     awg.write(f'trace1:dwidth {res}')
     print(f'Output res/mode: ', awg.query('trace1:dwidth?').strip())
 
-    # Set sample rate
+    # Set sample rate.
     awg.write(f'frequency:raster {fs}')
     print('Sample rate: ', awg.query('frequency:raster?').strip())
 
@@ -162,20 +161,20 @@ def main():
     awg.write('output1:route dac')
     awg.write('output1:norm on')
 
-    # Configure marker output
+    # Configure marker output.
     awg.write('marker:sample:voltage:high 0.5')
     awg.write('marker:sample:voltage:low 0')
 
-    # Configure external reference
+    # Configure external reference.
     # A common source/analyzer reference is critical to accurately measure pulse-to-pulse phase.
     awg.write('roscillator:source ext')
     awg.write('roscillator:frequency 10e6')
     print('Reference source: ', awg.query('roscillator:source?').strip())
 
-    # Build components for phase coherent sequence
+    # Build components for phase coherent sequence.
     pulses, endWfm, idleSamples, endIdleSamples = cw_pulse_sequence_coherent(fs, cf, width, pri, res)
 
-    # Reset sequencer
+    # Reset sequencer.
     awg.write('seq:delete:all')
     awg.query(f'seq:def:new? {2 * pulses.shape[0] + 1}')
 
@@ -191,21 +190,21 @@ def main():
     on pages 262-265 in Keysight M8190A User's Guide (Edition 13.0, October 2017).
     """
 
-    # Build sequence
+    # Build sequence.
     for i in range(len(pulses)):
         awg.write(f'trace1:def {i + 1}, {len(pulses[i])}')
         awg.write_binary_values(f'trace1:data {i + 1}, 0, ', pulses[i], datatype='h')
 
-        # Configure data segment
-        # If start of sequence, send start-of-sequence (bit 28) and marker enable (bit 24) control entries
+        # Configure data segment.
+        # If start of sequence, send start-of-sequence (bit 28) and marker enable (bit 24) control entries.
         if i == 0:
             awg.write(f'stable:data 0, {1 << 28 | 1 << 24}, 1, 1, 1, 0, #hffffffff')
-        # Otherwise, send waveform data with 0 control entry
+        # Otherwise, send waveform data with 0 control entry.
         else:
             awg.write(f'stable:data {2 * i}, 0, 0, 1, {i + 1}, 0, #hffffffff')
 
-        # Configure Idle segment(s)
-        # If sending final pulse, create a smaller idle waveform and add the ending waveform
+        # Configure Idle segment(s).
+        # If sending final pulse, create a smaller idle waveform and add the ending waveform.
         if i == len(pulses) - 1:
             awg.write(f'stable:data {2 * i + 1}, {1 << 31}, 0, 0, 0, {endIdleSamples}, 0')
 
@@ -213,7 +212,7 @@ def main():
             awg.write_binary_values(f'trace:data {i + 2}, 0, ', endWfm, datatype='h')
 
             awg.write(f'stable:data {2 * i + 2}, {1 << 30}, 0, 1, {i + 2}, 0, #hffffffff')
-        # Otherwise, create idle sequence normally in the middle of the sequence
+        # Otherwise, create idle sequence normally in the middle of the sequence.
         else:
             awg.write(f'stable:data {2 * i + 1}, {1 << 31}, 0, 0, 0, {idleSamples}, 0')
 

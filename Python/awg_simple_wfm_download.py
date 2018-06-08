@@ -14,7 +14,7 @@ import visa
 
 
 class awgError(Exception):
-    """Generic class for AWG related errors"""
+    """Generic class for AWG related errors."""
     pass
 
 
@@ -29,8 +29,9 @@ def search_connect(ipAddress):
 
 
 def err_check(inst):
-    """Checks for and prints out all errors in error queue."""
-    while inst.query('*esr?') != '0\n':
+    """Prints out all errors and clears error queue. Certain instruments format the *ESR?
+    response differently, so process it down to the least common denominator before checking."""
+    while inst.query('*esr?').strip().replace('+', '') != '0':
         print(inst.query('syst:err?'))
     print(inst.query('syst:err?'))
 
@@ -68,23 +69,22 @@ def main():
     awg.query('*opc?')
     awg.write('abort')
 
-    # User-defined sample rate and sine frequency
+    # User-defined sample rate and sine frequency.
     ############################################################################
     fs = 10e9
     cf = 100e6
     ############################################################################
 
-    # Configure AWG output mode
+    # Configure AWG output mode.
     awg.write('func:mode arb')
     print('Output mode:', awg.query('func:mode?').strip())
 
-    # Define resolution
-    # use 'wsp' for 12-bit and 'wpr' for 14-bit
+    # Define DAC resolution. Use 'wsp' for 12-bit and 'wpr' for 14-bit.
     res = 'wsp'
     awg.write(f'trace1:dwidth {res}')
     print('Output res/mode:', awg.query('trace1:dwidth?').strip())
 
-    # Set sample rate
+    # Set sample rate.
     awg.write(f'frequency:raster {fs}')
     print('Sample rate: ', awg.query('frequency:raster?').strip())
 
@@ -102,7 +102,7 @@ def main():
     offsetRead = float(awg.query('dc:volt:offs?').strip())
     print(f'Amplitude: {ampRead} V, Offset: {offsetRead} V')
 
-    # Define a waveform
+    # Define a waveform.
     rl = fs / cf * 64
     t = np.arange(0, rl) / fs
     t = np.linspace(0, rl / fs, rl, endpoint=False)
@@ -118,6 +118,7 @@ def main():
     awg.write('init:imm')
     awg.query('*opc?')
 
+    # Check for errors and gracefully disconnect.
     err_check(awg)
     awg.close()
 
