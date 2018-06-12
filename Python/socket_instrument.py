@@ -66,11 +66,13 @@ class SocketInstrument:
     def err_check(self):
         """Prints out all errors and clears error queue.
 
-        Certain instruments format the *ESR? response differently, so remove whitespace and
+        Certain instruments format the syst:err? response differently, so remove whitespace and
         extra characters before checking."""
 
-        while self.query('*esr?').strip().replace('+', '') != '0':
-            print(self.query('syst:err?'))
+        err = self.query('syst:err?').strip().replace('+', '').replace('-', '')
+        while err != '0,"No error"':
+            print(err)
+            err = self.query('syst:err?').strip()
         print(self.query('syst:err?'))
 
     def binblockread(self, dtype=np.int8, debug=False):
@@ -169,7 +171,7 @@ class SocketInstrument:
         # Check error status register and notify of problems
         r = self.query('*esr?')
         if int(r) is not 0:
-            # self.err_check()
+            self.err_check()
             raise BinblockError(f'Non-zero ESR: {r}')
         pass
 
@@ -246,7 +248,7 @@ def vna_example(ipAddress, port=5025):
 
 
 def main():
-    awg_example('10.112.181.139', port=5025)
+    # awg_example('10.112.181.139', port=5025)
     vna_example('10.112.181.177', port=5025)
 
 

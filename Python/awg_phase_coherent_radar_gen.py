@@ -36,15 +36,24 @@ def search_connect(ipAddress):
 
 
 def err_check(inst):
-    """Checks for and prints out all errors in error queue."""
-    while inst.query('*esr?') != '0\n':
-        print(inst.query('syst:err?'))
+    """Prints out all errors and clears error queue.
+
+    Certain instruments format the syst:err? response differently, so remove whitespace and
+    extra characters before checking."""
+
+    err = inst.query('syst:err?').strip().replace('+', '').replace('-', '')
+    while err != '0,"No error"':
+        print(err)
+        err = inst.query('syst:err?').strip()
     print(inst.query('syst:err?'))
 
 
 def check_wfm(wfm, res='wsp'):
     """Checks minimum size and granularity and returns waveform with
-    appropriate binary formatting based on the chosen DAC resolution."""
+    appropriate binary formatting based on the chosen DAC resolution.
+
+    See pages 273-274 in Keysight M8190A User's Guide (Edition 13.0, October 2017) for more info."""
+
     if res.lower() == 'wpr':
         gran = 48
         minLen = 240
@@ -55,8 +64,14 @@ def check_wfm(wfm, res='wsp'):
         minLen = 320
         binMult = 2047
         binShift = 4
+    elif 'intx' in res.lower():
+        # Granularity, min length, and binary formatting are the same for all interpolated modes.
+        gran = 24
+        minLen = 120
+        binMult = 16383
+        binShift = 1
     else:
-        raise awgError('Invalid output resolution selected. Choose \'wpr\' for 14 bits or \'wsp\' or 12 bits.')
+        raise awgError('Invalid output resolution selected.')
 
     rl = len(wfm)
     if rl < minLen:
@@ -135,7 +150,7 @@ def cw_pulse_sequence_coherent(fs, cf, pwTime, pri, res='wsp'):
 def main():
     """Coherent pulse creation example."""
     # Substitute your instrument's IP address here.
-    awg = search_connect('TW56330445.cla.is.keysight.com')
+    awg = search_connect('10.112.181.78')
     awg.write('*rst')
     awg.query('*opc?')
     awg.write('abort')
