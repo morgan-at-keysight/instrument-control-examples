@@ -2,8 +2,8 @@
 Digital Upconverter Frequency Agile Pulse Train Example for M8190
 Author: Morgan Allison
 Updated: 06/18
-Creates a simple cw pulsed signal using digital upconversion in the M8190 and adjusts
-its frequency using the action table.
+Creates a pulsed cw signal with pulse shaping using digital upconversion in
+the M8190 and adjusts pulse-to-pulse frequency using the action table.
 Uses socket_instrument.py for instrument communication.
 Python 3.6.4
 NumPy 1.14.2
@@ -79,7 +79,41 @@ def action_table_freq_builder(awg, freq):
         i += 1
 
 
-def pulse_calculator(fs, pwTime, pri, res='intx3'):
+def iq_pulse_envelope(fs, rise, fall, pw, shape='raised-cosine'):
+    """Calculates and returns the iq envelope for a cw pulse."""
+
+    validShapes = ['rectangular', 'trapezoidal', 'raised-cosine']
+    if shape not in validShapes:
+        raise awgError('Invalid pulse shape. Choose "rectangular", "raised-cosine", or "trapezoidal".')
+
+    # Rise and fall times are 0-100% times. Pulse width is calculated at the 50% rise/fall points.
+    rSamples = int(rise * fs)
+    fSamples = int(fall * fs)
+    pwSamples = int(pw * fs - rSamples / 2 - fSamples / 2)
+    totalSamples = rSamples + pwSamples + fSamples
+
+    # Create edge shapes.
+    if shape == 'rectangular':
+        rEdge = np.zeros(rSamples)
+        fEdge = np.zeros(fSamples)
+    elif shape == 'trapezoidal':
+        rEdge = np.linspace(0, 1, rSamples)
+        fEdge = np.linspace(1, 0, fSamples)
+    else:  # raised-cosine
+        rEdge = (1 + np.cos(np.linspace(-np.pi, 0, rSamples))) / 2
+        fEdge = (1 + np.cos(np.linspace(0, np.pi, fSamples))) / 2
+    # Create pulse on time.
+    pulse = np.ones(pwSamples)
+
+    # Concatenate edges with pulse on time and apply to i and q wfms.
+    envelope = np.concatenate((rEdge, pulse, fEdge))
+    i = envelope * np.ones(totalSamples)
+    q = envelope * np.zeros(totalSamples)
+
+    return i, q
+
+
+def iq_pulse_calculator(fs, rise, fall, pw, shape, pri, res='intx3'):
     """Creates waveforms and idle samples required to build a pulse train that changes frequency.
 
     Configuration segments are required to enable changes from the action table. These segments do
@@ -112,9 +146,8 @@ def pulse_calculator(fs, pwTime, pri, res='intx3'):
     configWfm = iq_wfm_combiner(iConfig, qConfig)
 
     # Create pulse on time wfm with markers.
-    pwSamples = int(fs * pwTime)
-    iPulse = np.ones(pwSamples, dtype=np.int16)
-    qPulse = np.ones(pwSamples, dtype=np.int16)
+    iPulse, qPulse = iq_pulse_envelope(fs, rise, fall, pw, shape)
+    pwSamples = len(iPulse)
 
     # Minimum length check
     if pwSamples < minLen:
@@ -179,7 +212,6 @@ def pulse_sequence_builder(awg, seqLength, idleSamples, endIdleSamples):
     start = 1 << 28
     mkr = 1 << 24
     # <command_code> bits 31-16: action table id, bits 15-0: idle/config select.
-
     for i in range(seqLength):
         # If start of sequence, set start flag & command code and load configWfm.
         if i == 0:
@@ -211,7 +243,10 @@ def main():
     ############################################################################
     fs = 7.2e9
     cf = 100e6
+    rise = 100e-9
+    fall = 100e-9
     pw = 10e-6
+    shape = 'trapezoidal'
     pri = 20e-6
 
     # Define resolution
@@ -237,12 +272,14 @@ def main():
     print('Reference source: ', awg.query('roscillator:source?').strip())
     print('Reference frequency: ', awg.query('roscillator:frequency?').strip())
 
-    # Configure and enable DAC output path.
-    awg.write('output1:route dac')
+    # Configure and enable AC output path.
+    awg.write('output1:route ac')
     awg.write('output1:norm on')
 
+    awg.write('ac1:voltage:amplitude 2.0')
+
     # Create waveforms required to generate pulse train and download to M8190.
-    pulse, config, idle, endIdle = pulse_calculator(fs, pw, pri, res)
+    pulse, config, idle, endIdle = iq_pulse_calculator(fs, rise, fall, pw, shape, pri, res)
 
     # Note the divide by two here, waveform length is defined in terms of IQ PAIRS.
     awg.write(f'trace1:def 1, {len(config) / 2}')

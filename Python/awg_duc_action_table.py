@@ -3,7 +3,7 @@ Digital Upconverter Action Table Example for M8190
 Author: Morgan Allison
 Updated: 06/18
 Creates a simple sine wave using digital upconversion in the M8190 and adjusts its amplitude,
-phase, and frequency using the action table.
+phase, and frequency using the action table. Best viewed on an oscilloscope.
 Uses socket_instrument.py for instrument communication.
 Python 3.6.4
 NumPy 1.14.2
@@ -75,10 +75,10 @@ def config_segment_creator(fs, res):
     # Granularity in all interpolated modes is 24 samples.
     gran = 24
 
-    # Create waveform (both i and q are all ones).
+    # Create waveform (i is ones and q is zeroes).
     rl = 257 * gran
     i = np.ones(rl)
-    q = np.ones(rl)
+    q = np.zeros(rl)
 
     # Create a short marker pulse beginning at sample 240.
     sampMkr = np.zeros(rl, dtype=np.int16)
@@ -205,8 +205,8 @@ def main():
     print('Reference source: ', awg.query('roscillator:source?').strip())
     print('Reference frequency: ', awg.query('roscillator:frequency?').strip())
 
-    # Configure and enable DAC output path.
-    awg.write('output1:route dac')
+    # Configure and enable AC output path.
+    awg.write('output1:route ac')
     awg.write('output1:norm on')
 
     # Create config segment and download to M8190.

@@ -60,10 +60,10 @@ def cw_iq_wfm_creator(fs, cf, res):
     intFactor = int(res.lower().split('x')[-1])
     fs = fs / intFactor
 
-    # Create waveform (both i and q are all ones).
+    # Create waveform (i is ones and q is zeroes).
     rl = int(fs / cf * 24)
     i = np.ones(rl)
-    q = np.ones(rl)
+    q = np.zeros(rl)
 
     # Create 50% duty cycle markers.
     sampMkr = np.append(np.ones(int(rl / 2), dtype=np.int16), np.zeros(int(rl / 2), dtype=np.int16))
@@ -116,8 +116,8 @@ def main():
     awg.write(f'frequency:raster {fs}')
     print('Sample rate: ', awg.query('frequency:raster?'))
 
-    # Configure and enable DAC output path.
-    awg.write('output1:route dac')
+    # Configure and enable AC output path.
+    awg.write('output1:route ac')
     awg.write('output:norm on')
 
     # Define baseband iq waveform and download to segment 1.
