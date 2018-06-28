@@ -72,8 +72,8 @@ class SocketInstrument:
         err = self.query('syst:err?').strip().replace('+', '').replace('-', '')
         while err != '0,"No error"':
             print(err)
-            err = self.query('syst:err?').strip()
-        # print(self.query('syst:err?'))
+            err = self.query('syst:err?').strip().replace('+', '').replace('-', '')
+        print(self.query('syst:err?'))
 
     def binblockread(self, dtype=np.int8, debug=False):
         """Read data with IEEE 488.2 binary block format
