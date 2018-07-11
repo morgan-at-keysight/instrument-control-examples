@@ -124,7 +124,7 @@ def cw_pulse_sequence(fs, cf, pwTime, pri, res='wpr'):
 def main():
     """CW pulse sequence creation example."""
     # Substitute your instrument's IP address here.
-    awg = search_connect('10.112.181.78')
+    awg = search_connect('141.121.210.171')
     awg.write('*rst')
     awg.query('*opc?')
     awg.write('abort')
@@ -147,7 +147,7 @@ def main():
     print('Sample rate: ', awg.query('frequency:raster?').strip())
 
     # Configure and enable output path.
-    awg.write('output1:route dac')
+    awg.write('output1:route ac')
     awg.write('output1:norm on')
 
     # Create building blocks for cw pulse sequence.

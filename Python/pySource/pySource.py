@@ -11,7 +11,6 @@ Tested on M8190A
 """
 
 from socket_instrument import *
-# from time import perf_counter
 
 
 class AwgError(Exception):
@@ -34,7 +33,7 @@ class M8190A(SocketInstrument):
         self.out2 = self.query('output2:route?').strip()
         self.cf1 = float(self.query('carrier1:freq?').strip().split(',')[0])
         self.cf2 = float(self.query('carrier2:freq?').strip().split(',')[0])
-        self.refSource = self.query('roscillator:source?').strip()
+        self.refSrc = self.query('roscillator:source?').strip()
         self.refFreq = float(self.query('roscillator:frequency?').strip())
 
     def sanity_check(self):
@@ -44,7 +43,7 @@ class M8190A(SocketInstrument):
         print(f'Output path 1: {self.out1}, Output path 2: {self.out2}')
         print(f'Carrier 1: {self.cf1} Hz, Carrier 2: {self.cf2}')
         print(f'Function 1: {self.func1}, Function 2: {self.func2}')
-        print('Ref source:', self.refSource)
+        print('Ref source:', self.refSrc)
         print('Ref frequency:', self.refFreq)
 
     def check_wfm(self, wfm):
@@ -172,7 +171,7 @@ class M8195A(SocketInstrument):
         self.dacMode = self.query('inst:dacm?').strip()
         self.fs = float(self.query('frequency:raster?').strip())
         self.func = self.query('func:mode?').strip()
-        self.refSource = self.query('roscillator:source?').strip()
+        self.refSrc = self.query('roscillator:source?').strip()
         self.refFreq = float(self.query('roscillator:frequency?').strip())
         self.gran = 256
         self.minLen = 256
@@ -184,7 +183,7 @@ class M8195A(SocketInstrument):
         print('Sample rate:', self.fs)
         print('DAC Mode:', self.dacMode)
         print('Function:', self.func)
-        print('Ref source:', self.refSource)
+        print('Ref source:', self.refSrc)
         print('Ref frequency:', self.refFreq)
 
     def check_wfm(self, wfm):
@@ -232,16 +231,13 @@ class M8195A(SocketInstrument):
 
 
 def main():
-    awg = M8190A('10.112.181.78', port=5025, reset=True)
-    awg.set_resolution('intx48')
+    awg = M8190A('141.121.210.171', port=5025, reset=True)
+    awg.configure(res='intx3', cf1=1e9)
     awg.sanity_check()
     # wfm = np.sin(np.linspace(0, 2 * np.pi, 2400))
     i = np.ones(awg.minLen, dtype=np.int16)
     q = np.zeros(awg.minLen, dtype=np.int16)
-    iq = awg.iq_wfm_combiner(i, q)
-    awg.download_wfm(iq, iq=True)
-    awg.write('carrier:freq 2e9')
-    awg.write('func:mode arb')
+    awg.download_iq_wfm(i, q)
     awg.write('trace:select 1')
     awg.write('output1:route ac')
     awg.write('output1:norm on')

@@ -233,7 +233,7 @@ def pulse_sequence_builder(awg, seqLength, idleSamples, endIdleSamples):
 
 def main():
     """Creates a simple sine wave using digital upconversion in the M8190."""
-    awg = SocketInstrument('10.112.181.78', port=5025)
+    awg = SocketInstrument('141.121.210.171', port=5025)
     print('Connected to:', awg.instId)
     awg.write('*rst')
     awg.query('*opc?')
@@ -267,7 +267,7 @@ def main():
     print('Sample rate: ', awg.query('frequency:raster?'))
 
     # Set external reference.
-    awg.write('roscillator:source ext')
+    awg.write('roscillator:source axi')
     awg.write('roscillator:frequency 10e6')
     print('Reference source: ', awg.query('roscillator:source?').strip())
     print('Reference frequency: ', awg.query('roscillator:frequency?').strip())
@@ -288,7 +288,7 @@ def main():
     awg.binblockwrite('trace1:data 2, 0, ', pulse)
 
     # Build action table and sequence.
-    freq = [60e6, 75e6, 100e6, 125e6, 140e6]
+    freq = [980e6, 990e6, 1e9, 1.01e9, 1.02e9]
     action_table_freq_builder(awg, freq)
     pulse_sequence_builder(awg, len(freq), idle, endIdle)
 
