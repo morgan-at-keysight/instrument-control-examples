@@ -171,8 +171,9 @@ class SocketInstrument:
         # Check error status register and notify of problems
         r = self.query('*esr?')
         if int(r) is not 0:
+            print(r)
             self.err_check()
-            raise BinblockError(f'Non-zero ESR: {r}')
+            # raise BinblockError(f'Non-zero ESR: {r}')
         pass
 
 
