@@ -11,7 +11,7 @@ Matplotlib 2.2.2
 Tested on N5232B PNA-L
 """
 
-from socket_instrument import *
+import socketscpi
 import matplotlib.pyplot as plt
 
 
@@ -55,13 +55,11 @@ def vna_acquire(vna, measName):
     vna.write('format real,64')  # Data type is double/float64, not int64.
 
     # Acquire measurement data.
-    vna.write('calculate1:data? fdata')
-    meas = vna.binblockread(dtype=np.float64)
+    meas = vna.binblockread('calculate1:data? fdata', datatype='d')
     vna.query('*opc?')
 
     # Acquire frequency data.
-    vna.write('calculate1:x?')
-    freq = vna.binblockread(dtype=np.float64)
+    freq = vna.binblockread('calculate1:x?', datatype='d')
     vna.query('*opc?')
 
     return freq, meas
@@ -71,7 +69,7 @@ def main():
     """Configures VNA to make a single sweep, acquiring all four 2-port
     S parameters in separate traces and plots each in a separate subplot."""
 
-    vna = SocketInstrument('10.112.181.177', port=5025)
+    vna = socketscpi.SocketInstrument('192.168.50.254', port=5025)
     print('Connected to:', vna.instId)
 
     measName = ['meas1', 'meas2', 'meas3', 'meas4']

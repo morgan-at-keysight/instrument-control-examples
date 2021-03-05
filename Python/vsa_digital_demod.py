@@ -10,23 +10,24 @@ NumPy 1.14.2
 Tested on N9030B PXA
 """
 
-from socket_instrument import *
-
+import socketscpi
+import matplotlib.pyplot as plt
 
 def main():
     """Sets up a digital demodulation measurement in VSA running on an X-Series
     analyzer and acquires an EVMrms measurement on a digital signal."""
 
     # User-definable configurations variables
-    cf = 2.4e9
+    cf = 1e9
     span = 10e6
+    numSymbols = 1024
     modType = 'qpsk'
-    sRate = 5e6
+    sRate = 1e6
     filterShape = 'rootraisedcosine'
-    alpha = 0.35
+    alpha = 0.5
 
     # Connect to and reset VSA.
-    vsa = SocketInstrument('127.0.0.1', port=5025)
+    vsa = socketscpi.SocketInstrument('127.0.0.1', port=5025)
     print('Connected to:', vsa.instId)
     vsa.write('*rst')
 
@@ -39,6 +40,7 @@ def main():
     vsa.query('*opc?')
 
     # Configure digital demod parameters
+    vsa.write(f'ddemod:format:rlength {numSymbols}')
     vsa.write(f'ddemod:mod "{modType}"')
     vsa.write(f'ddemod:srate {sRate}')
     vsa.write(f'ddemod:filter "{filterShape}"')
@@ -59,6 +61,15 @@ def main():
         meas = vsa.query(f'trace4:data:table? {name}').strip()
         print(f'{name}: {meas}')
 
+    vsa.write('format:trace:data real64')
+    evmVsTime = vsa.binblockread('trace3:data:y?', datatype='d').byteswap()
+
+    vsa.write('format:trace:data real64')
+    i = vsa.binblockread('trace1:data:x?', datatype='d').byteswap()
+    q = vsa.binblockread('trace1:data:y?', datatype='d').byteswap()
+
+    plt.plot(evmVsTime)
+    plt.show()
     # Check for errors and gracefully disconnect.
     vsa.err_check()
     vsa.disconnect()

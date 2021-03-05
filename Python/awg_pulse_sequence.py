@@ -124,7 +124,7 @@ def cw_pulse_sequence(fs, cf, pwTime, pri, res='wpr'):
 def main():
     """CW pulse sequence creation example."""
     # Substitute your instrument's IP address here.
-    awg = search_connect('141.121.210.171')
+    awg = search_connect('141.121.210.241')
     awg.write('*rst')
     awg.query('*opc?')
     awg.write('abort')

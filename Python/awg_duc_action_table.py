@@ -170,7 +170,7 @@ def sequence_builder(awg, seqLength):
 
 def main():
     """Creates a simple sine wave using digital upconversion in the M8190."""
-    awg = SocketInstrument('10.112.181.78', port=5025)
+    awg = SocketInstrument('141.121.210.171', port=5025)
     print('Connected to:', awg.instId)
     awg.write('*rst')
     awg.query('*opc?')

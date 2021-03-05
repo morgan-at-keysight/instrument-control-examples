@@ -89,6 +89,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+*.cfg
 
 # Spyder project settings
 .spyderproject
@@ -106,3 +107,8 @@ venv.bak/
 # Custom
 Python/pySandbox
 Python/gitlab
+examples-venv/*
+.idea/*
+Python/.idea/*
+Examples/*
+Scripts/*
