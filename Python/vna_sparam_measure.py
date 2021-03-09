@@ -11,9 +11,27 @@ Matplotlib 2.2.2
 Tested on N5232B PNA-L
 """
 
-import socketscpi
+import pyvisa
 import matplotlib.pyplot as plt
 
+
+def err_check(inst):
+    """Prints out all errors and clears error queue.
+
+    Certain instruments format the syst:err? response differently, so remove whitespace and
+    extra characters before checking."""
+
+    err = []
+
+    # Strip out extra characters
+    temp = inst.query("syst:err?").strip().replace('+', '').replace('-', '')
+    # Read all errors until none are left
+    while temp != '0,"No error"':
+        # Build list of errors
+        err.append(temp)
+        temp = inst.query('syst:err?').strip().replace('+', '').replace('-', '')
+    if err:
+        raise ValueError(err)
 
 def vna_setup(vna, start=10e6, stop=26.5e9, numPoints=401, ifBw=1e3, dwell=1e-3, measName=['meas1'], measParam=['S11']):
     """Sets up basic S parameter measurement(s).
@@ -55,11 +73,11 @@ def vna_acquire(vna, measName):
     vna.write('format real,64')  # Data type is double/float64, not int64.
 
     # Acquire measurement data.
-    meas = vna.binblockread('calculate1:data? fdata', datatype='d')
+    meas = vna.query_binary_values('calculate1:data? fdata', datatype='d')
     vna.query('*opc?')
 
     # Acquire frequency data.
-    freq = vna.binblockread('calculate1:x?', datatype='d')
+    freq = vna.query_binary_values('calculate1:x?', datatype='d')
     vna.query('*opc?')
 
     return freq, meas
@@ -69,8 +87,10 @@ def main():
     """Configures VNA to make a single sweep, acquiring all four 2-port
     S parameters in separate traces and plots each in a separate subplot."""
 
-    vna = socketscpi.SocketInstrument('192.168.50.254', port=5025)
-    print('Connected to:', vna.instId)
+    rm = pyvisa.ResourceManager()
+    vna = rm.open_resource('TCPIP0::10.0.0.251::hislip1::INSTR')
+    vna.timeout = 10000
+    print('Connected to:', vna.query("*IDN?"))
 
     measName = ['meas1', 'meas2', 'meas3', 'meas4']
     measParam = ['S11', 'S21', 'S12', 'S22']
@@ -95,8 +115,8 @@ def main():
         ax.set_ylabel(f'{measParam[t]} (dB)')
 
     # Check for errors and gracefully disconnect.
-    vna.err_check()
-    vna.disconnect()
+    err_check(vna)
+    vna.close()
 
     # Clean up and display plots.
     plt.tight_layout()

@@ -2,10 +2,17 @@
 XSA Pulse Measurement Example
 Author: Morgan Allison
 Updated: 03/2021
-Sets up the pulse measurement on an X-series signal analyzer and successively 
-makes new captures and saves the "top level" of the pulse in a text file.
+Sets up the pulse measurement on an X-series signal analyzer and 
+sets up pulse output on a VXG signal generator.
+Successively increases power out of the VXG and measures pulse power 
+in the signal analyzer.
+Saves both input and output power to a text file and plots output power vs input power.
+
 Python 3.9.x
-Tested on N9020B PXA
+PyVISA
+Matplotlib
+
+Tested on N9020B MXA and M9384B VXG
 """
 
 import pyvisa
@@ -31,8 +38,8 @@ def main():
     """Sets up a pulse measurement on an x series analyzer and captures
     the 'top level' measurement values from each acquisition."""
 
-    saIpAddress = "141.121.148.106"
-    vxgIpAddress = "141.121.151.242"
+    saIpAddress = "<enter IP Address of specan here>"
+    vxgIpAddress = "<enter IP Address of vxg here"
 
     # User-definable configuration variables for specan
     cf = 1e9 # Hz
