@@ -108,7 +108,7 @@ venv.bak/
 Python/pySandbox
 Python/gitlab
 examples-venv/*
-.idea/*
-Python/.idea/*
+Python/inst-ctrl-exmpl-venv/*
 Examples/*
 Scripts/*
+.vscode/*
