@@ -27,7 +27,7 @@ def main():
     alpha = 0.5
 
     # Connect to and reset VSA.
-    vsa = socketscpi.SocketInstrument('127.0.0.1', port=5025)
+    vsa = socketscpi.SocketInstrument('127.0.0.1', port=5026)
     print('Connected to:', vsa.instId)
     vsa.write('*rst')
 

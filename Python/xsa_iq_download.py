@@ -46,6 +46,7 @@ def main():
     # Set center frequency, span, rbw, and reference level
     sa.write(f':SENSe:FREQuency:CENTer {cf}')
     sa.write(f':SENSe:WAVeform:DIF:BANDwidth {ifBw}')
+    sa.write(f':SENSe:WAVeform:SWEep:TIME {acqTime}')
     sa.write(f':DISP:WAV:VIEW2:WIND:TRAC:Y:RLEV {refLevel}')
     sa.write(f':DISP:WAV:VIEW2:WIND:TRAC:Y:RPOS TOP')
     sa.write(f':DISP:WAV:VIEW2:WIND:TRAC:Y:PDIV {voltsPerDiv}')
