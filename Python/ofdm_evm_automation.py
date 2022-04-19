@@ -1,44 +1,33 @@
 import pyarbtools
+import numpy as np
+import matplotlib.pyplot as plt
 
-def full_generate_demod(analyzer='vma', vxgIpAddress="192.168.50.22", vmaIpAddress="192.168.50.3"):
+def full_generate_demod(analyzer='vma', vxgIpAddress="192.168.50.22", saIpAddress="192.168.50.3"):
     """
     This function automates the loading and playback of a waveform created by Keysight N7608C Signal Studio for Custom Modulation
     into an M9384B VXG signal generator and demodulation/analysis on a Keysight X-series signal analyzer with the N9054EM0E
     Vector Modulation Analysis option.
     """
-    
+    # This is the base waveform filename. It does not have a file extension associated with it.
+    # File extension will be added by the appropriate steps in this script
+    # wfmBaseFileName = "D:\\Users\\Instrument\\Desktop\\Morgan\\400MHz-cp-ofdm-longer-cp"
+    wfmBaseFileName = "D:\\Users\\Instrument\\Desktop\\Morgan\\500MHz-cp-ofdm-longer-cp"
+
     # vxg object creation
     vxg = pyarbtools.instruments.VXG(vxgIpAddress)
-
-    # # waveform import from remote computer
-    # wfmPath = "C:\\Temp\\abishek\\480MHz_morgan_ccdf_ContinuousPilot32Filter.csv"
-    # wfmID = "kpwfm"
-    # with open(wfmPath, newline='\n') as csvFile:
-    #     reader = csv.reader(csvFile, delimiter=',')
-    #     raw = []
-    #     for row in reader:
-    #         try:
-    #             raw.append(float(row[0]) + 1j * float(row[1]))
-    #         except ValueError as e:
-    #             print(str(e))
-    # wfmData = np.array(raw, dtype=np.complex128)
     
-    # waveform import from signal studio on VXG hard drive
-    wfmPath = "D:\\Users\\Instrument\\Desktop\\480MHz_morgan_ccdf_ContinuousPilot32Filter.wfm"
+    # Append appropriate file extension to baseWfmFileName and load signal studio waveform file into VXG
+    wfmPath = f'{wfmBaseFileName}.wfm'
+    vxg.write(f'source:signal:waveform:select "{wfmPath}"')
 
+    
+    # Configure VXG, and begin playback
     # Waveform setup parameters
     cf = 18e9
     amp = -20
-    fs = 960e6
-    span = 510e6
-    
-    # # load waveform from remote computer
-    # vxg.download_wfm(wfmData=wfmData, wfmID=wfmID)
-    # vxg.play(wfmID=wfmID, ch=1)
+    span = 1e9
 
-    # Load local signal studio waveform file, configure VXG, and begin playback
-    vxg.write(f'source:signal:waveform:select "{wfmPath}"')
-    vxg.configure(cf1=cf, amp1=amp, fs1=fs, arbState=1, rfState=1, modState=1)
+    vxg.configure(cf1=cf, amp1=amp, arbState=1, rfState=1, modState=1)
 
     # IQ calibration
     ch = 1
@@ -51,35 +40,112 @@ def full_generate_demod(analyzer='vma', vxgIpAddress="192.168.50.22", vmaIpAddre
 
     """#####################################################################"""
     if analyzer.lower() == 'vsa':
-        # vsa object creation
-        vsaIpAddress = "127.0.0.1"
-        hw = "badger"
-        # hw = "Analyzer1"
-        vsa = pyarbtools.vsaControl.VSA(vsaIpAddress, port=5026, vsaHardware=hw)
-        
-        # vsa setup
-        amplifier = 0 # 0=none, 1=preamp, 2=LNA, 3=LNA+preamp
-        ifGain = 4
-        atten = 0
+        # VSA object creation and preset
+        hw = "Analyzer1"
+        vsa = pyarbtools.vsaControl.VSA(saIpAddress, port=5026, vsaHardware=hw)
+        vsa.write('*rst')
+        vsa.query("*opc?")
 
-        # setx file
-        setxPath = "C:\\Users\\moalliso\\OneDrive - Keysight Technologies\\Documents\\!Keysight\\!Customers\\Amazon\\Kuiper\\Kuiper Wfm Development\\Weidong\\morgan_ccdf_ContinuousPilot32Filter.setx"
+        # Append appropriate file extension to baseWfmFileName and load into VSA
+        setxPath = f'{wfmBaseFileName}.setx'
+
         vsa.custom_ofdm_format_setup(setupFile=setxPath)
         vsa.query("*opc?")
         vsa.set_data_source(fromHardware=True)
         vsa.set_cf(cf=cf)
-        vsa.set_amplifier(amplifier)
-        vsa.set_if_gain(ifGain)
-        vsa.set_attenuation(atten)
 
         # equalizer and tracking setup
-        vsa.custom_ofdm_equalizer_setup(useData=False, useDCPilot=False, usePilot=True, usePreamble=True)
-        vsa.custom_ofdm_tracking_setup(useData=False, amplitude=False, phase=True, timing=False)
+        vsa.custom_ofdm_equalizer_setup(useData=False, useDCPilot=False, usePilot=True, usePreamble=False)
+        vsa.custom_ofdm_tracking_setup(useData=False, amplitude=True, phase=True, timing=False)
 
-        vsa.acquire_single()
+        # Configure signal generator power levels and optimized attenuator/if gain settings for analyzer
+        # These will be used for the power sweep loop example
+        sigPowerList = [-20, -10, 0, 10, 15]
+        
+        """This section is not needed anymore since the VSA Beta release"""
+        # This set is for the 400 MHz signal on PXA
+        # attenList = [0, 0, 0, 20, 30]
+        # ifGainList = [4, -8, -16, -10, 10]
+
+        # This set is for the 500 MHz signal on PXA
+        # attenList = [0, 0, 6]
+        # ifGainList = [-4, -14, -16]
+
+        # This set is for the 400 MHz signal on N9042B
+        # attenList = [0, 0, 0, 10, 20]
+        # ifGainList = [4, -8, -16, -12, -12]
+
+        # This set is for the 500 MHz signal on N9042B
+        # attenList = [0, 0, 6, 10, 20]
+        # ifGainList = [-4, -14, -16, -12, -12]
+
+        # Empty list that will contain EVM values
+        bathtub = []
+
+        # for p, a, i in zip(sigPowerList, attenList, ifGainList):
+        for p in sigPowerList:
+            # Set optimal attenuation and IF gain for specific wfm and sig gen output power
+            # vsa.set_attenuation(atten=a)
+            # vsa.set_if_gain(ifGain=i)
+
+            # Set sig gen output power
+            vxg.configure(amp=p)
+    
+            # Put VSA in continuous acquisition mode
+            vsa.acquire_continuous()
+            vsa.query('*opc?')
+
+            # Temporarily set a long timeout, execute the EVM optimization, and set timeout back
+            vsa.socket.settimeout(60000)
+            vsa.write("input:analog:criteria:range:auto 'EvmAlgorithm', 60000")
+            vsa.query('*opc?')
+            vsa.socket.settimeout(10000)
+            
+            # Optionally, keep track of the automatic attenuation and IF gain states chosen by the EVM optimization
+            autoAtten = vsa.query('input:extension:parameters:get? "RangeInformationMechAtten"')
+            autoIfGain = vsa.query('input:extension:parameters:get? "RangeInformationIFGain"')
+
+            # Make single acquisition
+            vsa.acquire_single()
+            
+            # Configure results acquisiton formatting 
+            ofdmResultsTraceNum = 4
+            measList = vsa.query(f'trace{ofdmResultsTraceNum}:data:table:name?').strip().replace('"','').split(',')
+
+            # Query each measurement and build a dictionary with the measurement name and value.
+            for name in measList:
+                try:
+                    meas = float(vsa.query(f'trace{ofdmResultsTraceNum}:data:table? "{name}"').strip())
+                    unit = vsa.query(f'trace{ofdmResultsTraceNum}:data:table:unit? "{name}"').strip()
+                    # print(f"{name}: {meas}")
+                    
+                    # This is the % EVM to dB conversion
+                    if name == 'Ch1EVM':
+                        meas = 20 * np.log10(meas / 100)
+                        # Append the EVM value to the bathtub curve array
+                        bathtub.append(meas)
+
+                # This error check triggers when the float() call fails on non-numeric data like '***'
+                # These names and associated measurements are exluded from the dictionary
+                # The print statements are there for debugging and they can be replaced with the pass statement in production
+                except ValueError as e:
+                    pass
+                    # print(f"Error in {name}")
+                    # print(str(e))
+
+        # Plot results
+        plt.plot(sigPowerList, bathtub)
+        plt.title('Bathtub curve')
+        plt.xlabel('Signal Generator Power (dBm)')
+        plt.ylabel('EVM (dB)')
+        plt.show()
+
+        # Disconnect VSA from SA hardware
+        vsa.write('INITiate:SANalyzer:DISConnect')
+
     elif analyzer.lower() == 'vma':
         # Create object to control analyzer
-        vma = pyarbtools.vsaControl.VMA(vmaIpAddress)
+        vma = pyarbtools.vsaControl.VMA(saIpAddress)
 
         """The commands below are sent by default in the VMA constructor, this section is just for reference"""
         # # select and preset OFDM measurement in the vector modulation analyzer mode
@@ -89,8 +155,10 @@ def full_generate_demod(analyzer='vma', vxgIpAddress="192.168.50.22", vmaIpAddre
 
         # Optional: transfer xml setup file to analzyer
         # Note that this file may already be on the analyzer
-        sourcePath = "C:\\Temp\\abishek\\480MHz_morgan_ccdf_ContinuousPilot32Filter.xml"
-        destinationPath = "C:\\temp\\480MHz_morgan_ccdf_ContinuousPilot32Filter.xml"
+        sourcePath = "C:\\Users\\moalliso\\OneDrive - Keysight Technologies\\Documents\\!Keysight\\!Customers\\Amazon\\Kuiper\\Kuiper Wfm Development\\Abishek\\400MHz-cp-ofdm-longer-cp.xml"
+        destinationPath = "D:\\Users\\Instrument\\Desktop\\Morgan\\400MHz-cp-ofdm-longer-cp.xml"
+        # sourcePath = "C:\\Users\\moalliso\\OneDrive - Keysight Technologies\\Documents\\!Keysight\\!Customers\\Amazon\\Kuiper\\Kuiper Wfm Development\\Abishek\\500MHz-cp-ofdm-longer-cp.xml"
+        # destinationPath = "D:\\Users\\Instrument\\Desktop\\Morgan\\500MHz-cp-ofdm-longer-cp.xml"
 
         vma.send_file_to_analyzer(sourcePath=sourcePath, destinationPath=destinationPath)
 
@@ -101,7 +169,7 @@ def full_generate_demod(analyzer='vma', vxgIpAddress="192.168.50.22", vmaIpAddre
         vma.write(f'SENSe:OFDM:CCARrier:REFerence {cf}')
 
         # equalizer
-        vma.ofdm_equalizer_setup(useData=False, useDCPilot=False, usePilot=True, usePreamble=True)
+        vma.ofdm_equalizer_setup(useData=False, useDCPilot=False, usePilot=True, usePreamble=False)
         
         # tracking
         vma.ofdm_tracking_setup(useData=False, amplitude=False, phase=True, timing=False)
@@ -124,8 +192,14 @@ def full_generate_demod(analyzer='vma', vxgIpAddress="192.168.50.22", vmaIpAddre
         # Configure signal generator power levels and optimized attenuator/if gain settings for analyzer
         # These will be used for the power sweep loop example
         sigPowerList = [-20, -10, 0]
-        attenList = [0, 0, 6]
-        ifGainList = [12, 3, 0]
+        
+        # This is for the 400 MHz signal
+        attenList = [0, 0, 0]
+        ifGainList = [4, -8, -16]
+
+        # This set is for the 500 MHz signal
+        # attenList = [0, 0, 6]
+        # ifGainList = [-4, -14, -16]
 
         for p, a, i in zip(sigPowerList, attenList, ifGainList):
             # Set optimal attenuation and IF gain for specific wfm and sig gen output power
@@ -150,8 +224,8 @@ def full_generate_demod(analyzer='vma', vxgIpAddress="192.168.50.22", vmaIpAddre
 
 def main():
     vxgIpAddress="192.168.50.22"
-    vmaIpAddress="192.168.50.3"
-    full_generate_demod(analyzer='vma', vxgIpAddress=vxgIpAddress, vmaIpAddress=vmaIpAddress)
+    saIpAddress="192.168.50.3"
+    full_generate_demod(analyzer='vsa', vxgIpAddress=vxgIpAddress, saIpAddress=saIpAddress)
 
 
 if __name__ == "__main__":
