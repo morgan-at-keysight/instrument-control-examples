@@ -44,7 +44,7 @@ def main():
     print(f'Connected to {instID}')
 
     # Measurement setup
-    cf = 5e9
+    cf = 1.61625e9
     rbw = 3e6
     sweepTime = 5 # sec
     atten = 20
@@ -89,13 +89,19 @@ def main():
     for i in range(numRepetitions):
         # Single shot, start acquisition
         sa.write(':INITiate:SANalyzer')
-
+        
         # Poll the status:operation register to see if the instrument is waiting for trigger
-        triggered = 0
-        while triggered == 0:
-            triggered = int(sa.query('status:operation:condition?')) & (1 << 5)
+        # This bit will be HIGH while the instrument is waiting for a trigger
+        # It will go LOW when it receives a trigger AND when it is idle/not making a measurement
+        
+        # There is a delay between when the INITiate:SANalyzer command is sent and when the bit goes high
+        # So we add a delay in the code so that it doesn't immediately kick out of the while loop
+        sleep(1)
+        waitingForTrigger = 32
+        while waitingForTrigger != 0:
+            waitingForTrigger = int(sa.query('status:operation:condition?')) & (1 << 5)
             sleep(0.01)
-            # print(f'triggered? {triggered}')
+            # print(f'waiting for trigger? {waitingForTrigger}')
 
         # Once the instrument receives a trigger
         # Get current time
@@ -109,7 +115,7 @@ def main():
         while sweeping:
             sweeping = int(sa.query('status:operation:condition?')) & (1 << 3)
             sleep(0.01)
-            # print(f'sweeping? {sweeping}')
+            print(f'sweeping? {sweeping}')
 
         # Wait for acquisition to complete after receiving the trigger
         # This in addition to polling the "sweeping" bit is belt + suspenders
