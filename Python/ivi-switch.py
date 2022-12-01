@@ -25,6 +25,12 @@ class BaseSwitch():
     def __init__(self, visaAddress, idQuery=False, reset=False):
         # Remember when we needed to import the Python wrapper generated 
         # by comtypes to get the interface for client.CreateObject()? Well, here is the payoff
+        # To determine what to use as the interface keyword argument, go to
+        # <python directory>\Lib\site-packages\comtypes\gen\AgMWSwitchlib.py and find 
+        # the long alphanumeric string in the first line. Go back into the comtypes\gen\ 
+        # directory and open the file that matches the long alphanumeric string.
+        # The first class definition in this file is IAgMWSwitch. The interface keyword argument
+        # should be AgMWSwitchLib.IAgMWSwitch
         self.comObj = client.CreateObject('AgMWSwitch.AgMWSwitch', interface=AgMWSwitchLib.IAgMWSwitch)
         self.comObj.Initialize(visaAddress, idQuery, reset, '')
 
