@@ -125,7 +125,7 @@ def main():
     """Configures VNA to make a single sweep, acquiring all four 2-port
     S parameters in separate traces and plots each in a separate subplot."""
 
-    visaAddress = 'TCPIP0::192.168.50.120::hislip0::INSTR'
+    visaAddress = 'TCPIP0::127.0.0.1::hislip30::INSTR'
 
     vna = pyvisa.ResourceManager().open_resource(visaAddress)
     vna.timeout = 10000
